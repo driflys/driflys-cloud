@@ -26,7 +26,7 @@ export const sendContactUsEmail = functions.https.onRequest(
       return;
     }
 
-    cors(request, response, async () => {
+    cors()(request, response, async () => {
       try {
         const feedback = request.body;
 
@@ -85,7 +85,7 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
       return;
     }
 
-    cors(request, response, async () => {
+    cors()(request, response, async () => {
       try {
         const email = request.query?.email as string;
         if (!email) {
