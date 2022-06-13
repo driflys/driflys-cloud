@@ -3,30 +3,32 @@ import * as functions from "firebase-functions";
 import { sendEmail } from "./email.service";
 import { EmailModes, EmailTemplates } from "./types/Email";
 
-const cors = require("cors")({
-  origin: true,
-});
+import * as cors from "cors";
+
+const corsHandler = cors({ origin: true });
 
 const EMAIL = "driflys@gmail.com";
 
 export const status = functions.https.onRequest((request, response) => {
-  if (request.method !== "GET") {
-    response.status(404).send();
-    return;
-  }
-  cors(request, response, () => {
+  // response.set("Access-Control-Allow-Origin", "*");
+  corsHandler(request, response, () => {
+    if (request.method !== "GET") {
+      response.status(404).send();
+      return;
+    }
     response.status(200).send("Up & Running...");
   });
 });
 
 export const sendContactUsEmail = functions.https.onRequest(
   async (request, response) => {
-    if (request.method !== "POST") {
-      response.status(404).send();
-      return;
-    }
+    // response.set("Access-Control-Allow-Origin", "*");
+    corsHandler(request, response, async () => {
+      if (request.method !== "POST") {
+        response.status(404).send();
+        return;
+      }
 
-    cors()(request, response, async () => {
       try {
         const feedback = request.body;
 
@@ -57,8 +59,8 @@ export const sendContactUsEmail = functions.https.onRequest(
               title: "Thank you for contacting Driflys.",
               name: feedback.firstName || feedback.lastName || "",
               body: `Thank you for contacting Driflys. We wanted to let you know that we've received your message. 
-              We appreciate the time you have taken to contact us.If you would like to add anything to the initial 
-              message, you can go on. Feel free to reply to this email anytime.`,
+            We appreciate the time you have taken to contact us.If you would like to add anything to the initial 
+            message, you can go on. Feel free to reply to this email anytime.`,
             },
           },
         });
@@ -80,12 +82,13 @@ export const sendContactUsEmail = functions.https.onRequest(
 
 export const sendConnectingWithUsEmail = functions.https.onRequest(
   async (request, response) => {
-    if (request.method !== "POST") {
-      response.status(404).send();
-      return;
-    }
+    // response.set("Access-Control-Allow-Origin", "*");
+    corsHandler(request, response, async () => {
+      if (request.method !== "POST") {
+        response.status(404).send();
+        return;
+      }
 
-    cors()(request, response, async () => {
       try {
         const email = request.query?.email as string;
         if (!email) {
@@ -115,10 +118,10 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
               title: "Thank you for connecting with us",
               name: "",
               body: `Thank you very much for connecting with us. We are so excited to have you with
-          us at the beginning of our journey. We highly appreciate the interest you have 
-          shown in our all new certificate platform.  
-          We are planning to launch as soon as possible and you will be notified just in time.
-          If you have any questions, feel free to reply to this email anytime.`,
+        us at the beginning of our journey. We highly appreciate the interest you have 
+        shown in our all new certificate platform.  
+        We are planning to launch as soon as possible and you will be notified just in time.
+        If you have any questions, feel free to reply to this email anytime.`,
             },
           },
         });
