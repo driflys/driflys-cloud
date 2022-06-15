@@ -9,6 +9,7 @@ node_modules/
 
 # secrets
 aws-config.json
+.env
 
 firebase-debug.json
 ui-debug.json
