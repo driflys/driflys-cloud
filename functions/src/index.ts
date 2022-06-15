@@ -4,13 +4,13 @@ import { sendEmail } from "./email.service";
 import { EmailModes, EmailTemplates } from "./types/Email";
 
 import * as cors from "cors";
+import { sendMessage } from "./slack.service";
 
 const corsHandler = cors({ origin: true });
 
 const EMAIL = "driflys@gmail.com";
 
 export const status = functions.https.onRequest((request, response) => {
-  // response.set("Access-Control-Allow-Origin", "*");
   corsHandler(request, response, () => {
     if (request.method !== "GET") {
       response.status(404).send();
@@ -22,16 +22,13 @@ export const status = functions.https.onRequest((request, response) => {
 
 export const sendContactUsEmail = functions.https.onRequest(
   async (request, response) => {
-    // response.set("Access-Control-Allow-Origin", "*");
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
         response.status(404).send();
         return;
       }
-
+      const feedback = request.body;
       try {
-        const feedback = request.body;
-
         if (!feedback?.email) {
           response.status(404).json({ error: "No email was found" });
           return;
@@ -64,12 +61,28 @@ export const sendContactUsEmail = functions.https.onRequest(
             },
           },
         });
+
+        // send a message to slack channel
+        await sendMessage(
+          `🙋‍♂️ ${feedback.firstName}(${feedback.email}) contacted Driflys. See contact@driflys.com for more info.`
+        );
+
         functions.logger.info(
           "Successfully sent the contact us thank you email",
           { structuredData: true }
         );
         response.json(feedback);
       } catch (err) {
+        await sendMessage(
+          `🔴 ${feedback.firstName}(${
+            feedback.email
+          }) failed to contact Driflys.\nFeedback: ${JSON.stringify(
+            feedback,
+            null,
+            2
+          )}\nError: ${err}`
+        );
+
         functions.logger.error(
           "Error occurred while sending the contact us thank you email",
           { structuredData: true }
@@ -82,15 +95,14 @@ export const sendContactUsEmail = functions.https.onRequest(
 
 export const sendConnectingWithUsEmail = functions.https.onRequest(
   async (request, response) => {
-    // response.set("Access-Control-Allow-Origin", "*");
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
         response.status(404).send();
         return;
       }
+      const email = request.query?.email as string;
 
       try {
-        const email = request.query?.email as string;
         if (!email) {
           response.status(404).json({ error: "No email was found" });
           return;
@@ -125,12 +137,19 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
             },
           },
         });
+
+        // send a message to slack channel
+        await sendMessage(`✨ New connection from ${email}`);
+
         functions.logger.info(
           "Successfully sent the connecting with us thank you email",
           { structuredData: true }
         );
         response.send();
       } catch (err) {
+        await sendMessage(
+          `🔴 ${email} failed to connect with Driflys.\nError: ${err}`
+        );
         functions.logger.error(
           "Error occurred while sending the connecting with us thank you email",
           { structuredData: true }
