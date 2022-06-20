@@ -7,8 +7,8 @@ import {
 
 import * as AWS from "aws-sdk";
 
-const FROM_EMAIL = "driflys@gmail.com";
-const REPLY_TO = "driflys@gmail.com";
+const FROM_EMAIL = "no-reply@contact.driflys.com";
+const REPLY_TO = "contact@driflys.com";
 
 AWS.config.loadFromPath("aws-config.json");
 
