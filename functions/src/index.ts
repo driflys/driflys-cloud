@@ -5,6 +5,7 @@ import { EmailModes, EmailTemplates } from "./types/Email";
 
 import * as cors from "cors";
 import { sendMessage } from "./slack.service";
+import { takeCertificateScreenshots } from "./screenshot.service";
 
 const corsHandler = cors({ origin: true });
 
@@ -154,6 +155,28 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
           "Error occurred while sending the connecting with us thank you email",
           { structuredData: true }
         );
+        response.status(500).send(err);
+      }
+    });
+  }
+);
+
+export const screenshotCertificates = functions.https.onRequest(
+  async (request, response) => {
+    corsHandler(request, response, async () => {
+      if (request.method !== "POST") {
+        response.status(404).send();
+        return;
+      }
+      try {
+        const { userId, templateId, certificates } = request.body;
+        const res = await takeCertificateScreenshots({
+          userId,
+          templateId,
+          certificates,
+        });
+        response.status(200).json(res);
+      } catch (err) {
         response.status(500).send(err);
       }
     });
