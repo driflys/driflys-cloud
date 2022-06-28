@@ -3,12 +3,14 @@ import * as functions from "firebase-functions";
 import * as cloudinary from "cloudinary";
 import * as streamifier from "streamifier";
 
+import { env } from "../constants/env";
+
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
-const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
+const CLOUDINARY_API_KEY = env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = env.CLOUDINARY_API_SECRET;
+const CLOUDINARY_CLOUD_NAME = env.CLOUDINARY_CLOUD_NAME;
 
 cloudinary.v2.config({
   api_key: CLOUDINARY_API_KEY,

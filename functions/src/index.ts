@@ -1,11 +1,16 @@
 import * as functions from "firebase-functions";
 
-import { sendEmail } from "./email.service";
+// service
+import { sendEmail } from "./service/email.service";
+import { sendMessage } from "./service/slack.service";
+import {
+  takeCertificateScreenshots,
+  takeTemplateScreenshot,
+} from "./service/screenshot.service";
+
 import { EmailModes, EmailTemplates } from "./types/Email";
 
 import * as cors from "cors";
-import { sendMessage } from "./slack.service";
-import { takeCertificateScreenshots } from "./screenshot.service";
 
 const corsHandler = cors({ origin: true });
 
@@ -161,8 +166,9 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
   }
 );
 
-export const screenshotCertificates = functions.https.onRequest(
-  async (request, response) => {
+export const screenshotCertificates = functions
+  .runWith({ memory: "1GB" })
+  .https.onRequest(async (request, response) => {
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
         response.status(404).send();
@@ -170,6 +176,7 @@ export const screenshotCertificates = functions.https.onRequest(
       }
       try {
         const { userId, templateId, certificates } = request.body;
+        functions.logger.info(`Request Body: ${JSON.stringify(request.body)}`);
         const res = await takeCertificateScreenshots({
           userId,
           templateId,
@@ -177,8 +184,50 @@ export const screenshotCertificates = functions.https.onRequest(
         });
         response.status(200).json(res);
       } catch (err) {
+        functions.logger.error(
+          `An error occurred while taking screenshots: ${err}`
+        );
         response.status(500).send(err);
       }
     });
-  }
-);
+  });
+
+export const screenshotCertificate = functions
+  .runWith({ memory: "1GB", timeoutSeconds: 180 })
+  .firestore.document("/certificates/{certificateId}")
+  .onCreate(async (snap, context) => {
+    try {
+      const certificateId = context.params.certificateId;
+      const certificate = snap.data();
+      const userId = certificate.userId;
+      const templateId = certificate.templateId;
+      const certificates = [{ id: certificateId, ...certificate }];
+      await takeCertificateScreenshots({ userId, templateId, certificates });
+      return;
+    } catch (err) {
+      functions.logger.error(
+        `An error occurred while taking screenshots on certificate: ${err}`
+      );
+      return err;
+    }
+  });
+
+export const screenshotTemplate = functions
+  .runWith({ memory: "1GB", timeoutSeconds: 180 })
+  .firestore.document("/templates/{templateId}")
+  .onCreate(async (snap, context) => {
+    try {
+      const templateId = context.params.templateId;
+      const template = snap.data();
+      const userId = template.userId;
+      const name = template.name;
+      const content = template.content;
+      await takeTemplateScreenshot({ templateId, name, content, userId });
+      return;
+    } catch (err) {
+      functions.logger.error(
+        `An error occurred while taking screenshots on template: ${err}`
+      );
+      return err;
+    }
+  });
