@@ -4,13 +4,19 @@ import * as functions from "firebase-functions";
 import { sendEmail } from "./service/email.service";
 import { sendMessage } from "./service/slack.service";
 import {
-  takeCertificateScreenshots,
+  sendCertificateEmail,
+  updateCertificate,
+  updateCertificateEmailStatus,
+} from "./service/certificate.service";
+import {
+  takeCertificateScreenshot,
   takeTemplateScreenshot,
 } from "./service/screenshot.service";
 
-import { EmailModes, EmailTemplates } from "./types/Email";
+import { EmailModes, EmailStatus, EmailTemplates } from "./types/Email";
 
 import * as cors from "cors";
+import { env } from "./constants/env";
 
 const corsHandler = cors({ origin: true });
 
@@ -22,7 +28,7 @@ export const status = functions.https.onRequest((request, response) => {
       response.status(404).send();
       return;
     }
-    response.status(200).send("Up & Running...");
+    return response.status(200).send("Up & Running...");
   });
 });
 
@@ -70,6 +76,7 @@ export const sendContactUsEmail = functions.https.onRequest(
 
         // send a message to slack channel
         await sendMessage(
+          env.SLACK_WEBHOOK_PRE_LAUNCH_URL,
           `🙋‍♂️ ${feedback.firstName}(${feedback.email}) contacted Driflys. See contact@driflys.com for more info.`
         );
 
@@ -77,9 +84,10 @@ export const sendContactUsEmail = functions.https.onRequest(
           "Successfully sent the contact us thank you email",
           { structuredData: true }
         );
-        response.json(feedback);
+        return response.json(feedback);
       } catch (err) {
         await sendMessage(
+          env.SLACK_WEBHOOK_PRE_LAUNCH_URL,
           `🔴 ${feedback.firstName}(${
             feedback.email
           }) failed to contact Driflys.\nFeedback: ${JSON.stringify(
@@ -93,7 +101,7 @@ export const sendContactUsEmail = functions.https.onRequest(
           "Error occurred while sending the contact us thank you email",
           { structuredData: true }
         );
-        response.status(500).send(err);
+        return response.status(500).send(err);
       }
     });
   }
@@ -145,75 +153,154 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
         });
 
         // send a message to slack channel
-        await sendMessage(`✨ New connection from ${email}`);
+        await sendMessage(
+          env.SLACK_WEBHOOK_PRE_LAUNCH_URL,
+          `✨ New connection from ${email}`
+        );
 
         functions.logger.info(
           "Successfully sent the connecting with us thank you email",
           { structuredData: true }
         );
-        response.send();
+        return response.send();
       } catch (err) {
         await sendMessage(
+          env.SLACK_WEBHOOK_PRE_LAUNCH_URL,
           `🔴 ${email} failed to connect with Driflys.\nError: ${err}`
         );
         functions.logger.error(
           "Error occurred while sending the connecting with us thank you email",
           { structuredData: true }
         );
-        response.status(500).send(err);
+        return response.status(500).send(err);
       }
     });
   }
 );
 
-export const screenshotCertificates = functions
-  .runWith({ memory: "1GB" })
-  .https.onRequest(async (request, response) => {
+export const sendTransactionEmail = functions.https.onRequest(
+  async (request, response) => {
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
         response.status(404).send();
         return;
       }
+
       try {
-        const { userId, templateId, certificates } = request.body;
-        functions.logger.info(`Request Body: ${JSON.stringify(request.body)}`);
-        const res = await takeCertificateScreenshots({
-          userId,
-          templateId,
-          certificates,
+        const transaction = request.body;
+        const res = await sendEmail({
+          mode: EmailModes.TEMPLATE,
+          props: transaction,
         });
-        response.status(200).json(res);
+        functions.logger.info("Successfully sent the transaction email", {
+          structuredData: true,
+        });
+        return response.status(200).json(res);
       } catch (err) {
         functions.logger.error(
-          `An error occurred while taking screenshots: ${err}`
+          "Error occurred while sending the transaction email",
+          { structuredData: true }
         );
-        response.status(500).send(err);
+        return response.status(500).send(err);
       }
     });
-  });
+  }
+);
 
-export const screenshotCertificate = functions
-  .runWith({ memory: "1GB", timeoutSeconds: 180 })
+export const triggerCertificateEmailWebhookAction = functions.https.onRequest(
+  async (request, response) => {
+    corsHandler(request, response, async () => {
+      try {
+        functions.logger.info(`AWS SES Webhook body: ${request.body}`);
+        await updateCertificateEmailStatus(request.body);
+        return response.status(200).send();
+      } catch (err) {
+        functions.logger.error(
+          `An error occurred while executing the email webhook action: ${err}`
+        );
+        return response.status(500).json(err);
+      }
+    });
+  }
+);
+
+// export const screenshotCertificates = functions
+//   .runWith({ memory: "1GB" })
+//   .https.onRequest(async (request, response) => {
+//     corsHandler(request, response, async () => {
+//       if (request.method !== "POST") {
+//         response.status(404).send();
+//         return;
+//       }
+//       try {
+//         const { userId, templateId, certificates } = request.body;
+//         functions.logger.info(`Request Body: ${JSON.stringify(request.body)}`);
+//         const res = await takeCertificateScreenshots({
+//           userId,
+//           templateId,
+//           certificates,
+//         });
+//         response.status(200).json(res);
+//       } catch (err) {
+//         functions.logger.error(
+//           `An error occurred while taking screenshots: ${err}`
+//         );
+//         response.status(500).send(err);
+//       }
+//     });
+//   });
+
+export const onCertificateCreate = functions
+  .runWith({ memory: "1GB" })
   .firestore.document("/certificates/{certificateId}")
   .onCreate(async (snap, context) => {
     try {
       const certificateId = context.params.certificateId;
-      const certificate = snap.data();
-      const userId = certificate.userId;
-      const templateId = certificate.templateId;
-      const certificates = [{ id: certificateId, ...certificate }];
-      await takeCertificateScreenshots({ userId, templateId, certificates });
+      const _certificate = snap.data();
+      const userId = _certificate.userId;
+      const templateId = _certificate.templateId;
+      const emailTemplateId = _certificate.emailTemplateId;
+      const certificate = { id: certificateId, ..._certificate };
+
+      // take certificate screenshot & upload to the file storage
+      const screenshotRes = await takeCertificateScreenshot({
+        userId,
+        templateId,
+        certificate,
+      });
+
+      // send certificate to the relevant receiver via email
+      const emailRes = await sendCertificateEmail({
+        receiverEmail: _certificate.receiver.email,
+        emailTemplateId: emailTemplateId,
+        certificateId: certificateId,
+      });
+      functions.logger.info(
+        `Email sent for certificate Id '${certificateId}': ${JSON.stringify(
+          emailRes
+        )}`
+      );
+
+      // update the certificate status to "screenshot taken" and "email sent" if no error occurred
+      await updateCertificate({
+        id: certificateId,
+        image: screenshotRes?.image,
+        pdf: screenshotRes?.pdf,
+        emailStatus: EmailStatus.SENT,
+        messageId: emailRes.MessageId,
+      });
+
       return;
     } catch (err) {
       functions.logger.error(
-        `An error occurred while taking screenshots on certificate: ${err}`
+        `An error occurred while executing onCertificateCreate event: ${err}`
       );
       return err;
     }
   });
 
-export const screenshotTemplate = functions
-  .runWith({ memory: "1GB", timeoutSeconds: 180 })
+export const onTemplateCreate = functions
+  .runWith({ memory: "1GB" })
   .firestore.document("/templates/{templateId}")
   .onCreate(async (snap, context) => {
     try {
@@ -230,4 +317,63 @@ export const screenshotTemplate = functions
       );
       return err;
     }
+  });
+
+export const onUserCreate = functions.firestore
+  .document("/users/{userId}")
+  .onCreate(async (snap, context) => {
+    try {
+      const userId = context.params.userId;
+      const user = snap.data();
+      const oAuth = user.oAuth;
+
+      if (!oAuth && !oAuth?.id) {
+        // send verification email to the user
+      } else {
+        // send welcome email to the user
+      }
+
+      // send a slack message
+      await sendMessage(
+        env.SLACK_WEBHOOK_LAUNCH_URL,
+        `✨ New user ${user?.email} signUp. See the email for more details.`
+      );
+
+      // send an email to me
+      await sendEmail({
+        mode: EmailModes.SIMPLE,
+        props: {
+          fromName: "Driflys",
+          subject: "Driflys - New user sign up",
+          receivers: [EMAIL],
+          body: `New user ${user?.email} sign up.\n${JSON.stringify(
+            {
+              id: userId,
+              firstName: user?.firstName,
+              lastName: user?.lastName,
+              email: user?.email,
+              plan: user?.plan,
+              planDuration: user?.planDuration,
+            },
+            null,
+            2
+          )}`,
+        },
+      });
+      return;
+    } catch (err) {
+      functions.logger.error(
+        `An error occurred while executing onUserCreate event: ${err}`
+      );
+      return err;
+    }
+  });
+
+export const onSendEmail = functions.pubsub
+  .topic("email_topic")
+  .onPublish((message, context) => {
+    const data = message.json;
+    functions.logger.info(`Received message: ${JSON.stringify(data)}`);
+    functions.logger.info(`Received context: ${JSON.stringify(context)}`);
+    return;
   });

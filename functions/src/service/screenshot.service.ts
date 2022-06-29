@@ -1,63 +1,48 @@
 import * as functions from "firebase-functions";
 
 import db from "../config/firebase";
+
+// utils
 import { upload } from "../utils/cloudinary";
 import inject from "../utils/inject";
 import { screenshotCanvas } from "../utils/screenshot";
 
-export const takeCertificateScreenshots = async ({
+export const takeCertificateScreenshot = async ({
   userId,
   templateId,
-  certificates,
+  certificate,
 }: {
   userId: string;
   templateId: string;
-  certificates: any[];
+  certificate: any;
 }) => {
   const templateSnapshot = await db
     .collection("templates")
     .doc(templateId)
     .get();
-  if (!templateSnapshot) return;
+  if (!templateSnapshot.exists) throw new Error("Template not found");
   const template: any = templateSnapshot.data()?.content;
+  const injectedTemplate = inject(template, certificate);
+  const { pdf, png } = await screenshotCanvas({
+    zoom: 2,
+    renderContent: injectedTemplate,
+    outputs: ["pdf", "jpeg"],
+  });
+  functions.logger.info(`Took screenshot for ${certificate.id}`);
+  const imgRes = await upload({
+    path: `users/${userId}/certificates/${certificate.id}/image-${certificate.id}`,
+    buffer: png as Buffer,
+  });
+  const pdfRes = await upload({
+    path: `users/${userId}/certificates/${certificate.id}/pdf-${certificate.id}`,
+    buffer: pdf as Buffer,
+  });
+  functions.logger.info(`Uploaded screenshot to Cloudinary`);
 
-  const out: any[] = [];
-
-  for (let i = 0; i < certificates?.length; i++) {
-    const certificate = certificates[i];
-    const injectedTemplate = inject(template, certificate);
-    const { pdf, png } = await screenshotCanvas({
-      zoom: 2,
-      renderContent: injectedTemplate,
-      outputs: ["pdf", "jpeg"],
-    });
-    functions.logger.info(`Took screenshot for ${certificate.name}`);
-    const imgRes = await upload({
-      path: `users/${userId}/certificates/${certificate.id}/image-${certificate.id}`,
-      buffer: png as Buffer,
-    });
-    const pdfRes = await upload({
-      path: `users/${userId}/certificates/${certificate.id}/pdf-${certificate.id}`,
-      buffer: pdf as Buffer,
-    });
-    functions.logger.info(`Uploaded screenshot to Cloudinary`);
-    await db
-      .collection("certificates")
-      .doc(certificate.id)
-      .update({
-        media: {
-          image: imgRes.secure_url,
-          pdf: pdfRes.secure_url,
-        },
-      });
-    functions.logger.info(`Updated Firestore`);
-    out.push({
-      certificateId: certificate.id,
-      image: imgRes.secure_url,
-      pdf: pdfRes.secure_url,
-    });
-  }
-  return out;
+  return {
+    image: imgRes.secure_url,
+    pdf: pdfRes.secure_url,
+  };
 };
 
 export const takeTemplateScreenshot = async ({

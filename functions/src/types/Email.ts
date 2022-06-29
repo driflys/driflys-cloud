@@ -16,6 +16,14 @@ export type EmailTemplateType =
   | EmailTemplates.VERIFICATION_EMAIL
   | EmailTemplates.GENERAL_PURPOSE_EMAIL;
 
+export enum EmailTemplateLogoSizes {
+  SMALL = "SMALL",
+  MEDIUM = "MEDIUM",
+  LARGE = "LARGE",
+}
+
+export type EmailTemplateLogoSize = keyof typeof EmailTemplateLogoSizes;
+
 export interface EmailProps {
   mode: EmailMode;
   props: SimpleEmailProps | TemplateEmailProps;

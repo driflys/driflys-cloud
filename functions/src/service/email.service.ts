@@ -6,6 +6,7 @@ import {
 } from "../types/Email";
 
 import * as AWS from "aws-sdk";
+import { PromiseResult } from "aws-sdk/lib/request";
 
 const FROM_EMAIL = "no-reply@contact.driflys.com";
 const REPLY_TO = "contact@driflys.com";
@@ -13,8 +14,9 @@ const REPLY_TO = "contact@driflys.com";
 AWS.config.loadFromPath("aws-config.json");
 
 export const sendEmail = async ({ mode, props }: EmailProps) => {
-  if (mode === EmailModes.SIMPLE) sendSimpleEmail(props as SimpleEmailProps);
-  else sendTemplateEmail(props as TemplateEmailProps);
+  if (mode === EmailModes.SIMPLE)
+    return await sendSimpleEmail(props as SimpleEmailProps);
+  return await sendTemplateEmail(props as TemplateEmailProps);
 };
 
 export const sendSimpleEmail = async (props: SimpleEmailProps) => {
@@ -43,7 +45,9 @@ export const sendSimpleEmail = async (props: SimpleEmailProps) => {
   return res;
 };
 
-const sendTemplateEmail = async (props: TemplateEmailProps) => {
+const sendTemplateEmail = async (
+  props: TemplateEmailProps
+): Promise<PromiseResult<AWS.SES.SendTemplatedEmailResponse, AWS.AWSError>> => {
   const obj = {
     Destination: {
       ToAddresses: props.receivers,
@@ -56,6 +60,5 @@ const sendTemplateEmail = async (props: TemplateEmailProps) => {
   };
   const ses = new AWS.SES({ apiVersion: "2010-12-01" });
   const res = await ses.sendTemplatedEmail(obj).promise();
-  // console.log("Sent Template Email", res);
   return res;
 };

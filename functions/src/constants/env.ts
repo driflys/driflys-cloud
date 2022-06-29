@@ -31,4 +31,7 @@ export const env = {
   API_BASE_URL: process.env.API_BASE_URL || "http://localhost:5000",
   JOB_SERVER_BASE_URL:
     process.env.JOB_SERVER_BASE_URL || "http://localhost:5001",
+
+  SLACK_WEBHOOK_PRE_LAUNCH_URL: process.env.SLACK_WEBHOOK_PRE_LAUNCH_URL || "",
+  SLACK_WEBHOOK_LAUNCH_URL: process.env.SLACK_WEBHOOK_LAUNCH_URL || "",
 };
