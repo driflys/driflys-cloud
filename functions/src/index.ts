@@ -374,6 +374,5 @@ export const onSendEmail = functions.pubsub
   .onPublish((message, context) => {
     const data = message.json;
     functions.logger.info(`Received message: ${JSON.stringify(data)}`);
-    functions.logger.info(`Received context: ${JSON.stringify(context)}`);
     return;
   });
