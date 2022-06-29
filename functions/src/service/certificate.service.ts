@@ -1,5 +1,4 @@
 import db from "../config/firebase";
-import { FieldValue } from "firebase-admin/firestore";
 
 import {
   EmailModes,
@@ -9,6 +8,7 @@ import {
   EmailTemplates,
 } from "../types/Email";
 import { sendEmail } from "./email.service";
+import { getNow } from "../utils/dateTime";
 
 interface CertificateEmailProps {
   receiverEmail: string;
@@ -90,7 +90,7 @@ export const updateCertificate = async ({
 
   const trace = {
     status: emailStatus,
-    timestamp: FieldValue.serverTimestamp(),
+    timestamp: getNow(),
   };
 
   await db
@@ -160,7 +160,7 @@ export const updateCertificateEmailStatus = async (props: any) => {
           status: emailStatus,
           error: error,
           traces: [
-            { status: emailStatus, timestamp: FieldValue.serverTimestamp() },
+            { status: emailStatus, timestamp: getNow() },
             ...certificate?.traces,
           ],
         },
