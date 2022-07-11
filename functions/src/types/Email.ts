@@ -34,12 +34,14 @@ export interface SimpleEmailProps {
   subject: string;
   body: string;
   receivers: string[];
+  configSet?: EmailConfigSet;
 }
 
 export interface TemplateEmailProps {
   fromName: string;
   receivers: string[];
   template: EmailTemplateType;
+  configSet?: EmailConfigSet;
   params?: {
     [key: string]: any;
   };
@@ -63,3 +65,11 @@ export enum EmailStatus {
   DELIVERED = "DELIVERED",
   ERROR = "ERROR",
 }
+
+export enum EmailConfigSets {
+  DRIFLYS_CERTIFICATE_EMAIL_CONFIG_SET = "DriflysCertificateEmailConfigSet",
+  DRIFLYS_OTHER_EMAIL_CONFIG_SET = "DriflysOtherEmailConfigSet",
+}
+export type EmailConfigSet =
+  | EmailConfigSets.DRIFLYS_CERTIFICATE_EMAIL_CONFIG_SET
+  | EmailConfigSets.DRIFLYS_OTHER_EMAIL_CONFIG_SET;
