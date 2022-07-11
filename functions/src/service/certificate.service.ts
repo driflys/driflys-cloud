@@ -1,6 +1,7 @@
 import db from "../config/firebase";
 
 import {
+  EmailConfigSets,
   EmailModes,
   EmailStatus,
   EmailTemplateLogoSize,
@@ -44,6 +45,7 @@ export const sendCertificateEmail = async ({
       subject: "Driflys Certificate",
       body: emailTemplate?.body || "Hello,\nThis is your certificate",
       receivers: [receiverEmail],
+      configSet: EmailConfigSets.DRIFLYS_CERTIFICATE_EMAIL_CONFIG_SET,
       params: {
         subject: emailTemplate?.subject || "Driflys Certificate",
         title: emailTemplate?.title || "Here is your certificate",
@@ -52,7 +54,9 @@ export const sendCertificateEmail = async ({
           id: certificateId,
           url: {
             display: emailTemplate?.url?.display ? "initial" : "none",
-            text: "https://driflys.com/certificates/" + certificateId,
+            text: `${
+              emailTemplate?.url?.text || "https://driflys.com/certificates"
+            }/${certificateId}`,
           },
         },
         button: {
@@ -61,15 +65,13 @@ export const sendCertificateEmail = async ({
         },
         brand: {
           name: emailTemplate?.brand?.name || "Driflys",
-          logo: {
-            src:
-              emailTemplate?.brand?.logo?.src ||
-              "https://res.cloudinary.com/driflys/image/upload/v1651332442/logos/Logo_Horizontal_-_No_Slogan.png",
-            width: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
-              .width,
-            height: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
-              .height,
-          },
+          logo:
+            emailTemplate?.brand?.logo?.src ||
+            "https://res.cloudinary.com/driflys/image/upload/v1651332442/logos/Logo_Horizontal_-_No_Slogan.png",
+          logoHeight: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
+            .height,
+          logoWidth: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
+            .width,
           address: emailTemplate?.brand?.address || "Matale, Sri Lanka",
         },
       },
@@ -109,7 +111,9 @@ export const updateCertificate = async ({
     });
 };
 
-export const updateCertificateEmailStatus = async (props: any) => {
+export const updateCertificateEmailStatus = async (data: any) => {
+  const props = JSON.parse(data);
+
   if (props.Type === "Notification") {
     const msg = JSON.parse(props.Message);
     const messageId = msg.mail.messageId;
@@ -117,7 +121,7 @@ export const updateCertificateEmailStatus = async (props: any) => {
     let emailStatus: EmailStatus;
     let error: string = "";
 
-    switch (msg.notificationType) {
+    switch (msg.eventType) {
       case "Delivery":
         emailStatus = EmailStatus.DELIVERED;
         break;
@@ -146,26 +150,43 @@ export const updateCertificateEmailStatus = async (props: any) => {
       .collection("certificates")
       .where("email.messageId", "==", messageId)
       .get();
-    if (snapshot.empty || snapshot.docs.length === 0)
+    if (snapshot.empty || snapshot.docs?.length === 0)
       throw new Error("Certificate does not exist");
-    const certificateId = snapshot.docs[0].id;
-    const certificate = snapshot.docs[0].data();
+    const certificateId = snapshot.docs[0]?.id;
+    const certificate = snapshot.docs[0]?.data();
+
+    const prevTraces = certificate?.email?.traces ?? [];
 
     // update the relevant fields in certificate doc
-    await db
+    if (prevTraces?.length > 0) {
+      return await db
+        .collection("certificates")
+        .doc(certificateId)
+        .update({
+          email: {
+            ...certificate?.email,
+            status: emailStatus,
+            error: error,
+            traces: [
+              { status: emailStatus, timestamp: getNow() },
+              ...prevTraces,
+            ],
+          },
+        });
+    }
+
+    return await db
       .collection("certificates")
       .doc(certificateId)
       .update({
         email: {
           status: emailStatus,
           error: error,
-          traces: [
-            { status: emailStatus, timestamp: getNow() },
-            ...certificate?.traces,
-          ],
+          traces: [{ status: emailStatus, timestamp: getNow() }],
         },
       });
   }
+  return;
 };
 
 const getEmailTemplateLogoSize = (
