@@ -25,8 +25,7 @@ const EMAIL = "driflys@gmail.com";
 export const status = functions.https.onRequest((request, response) => {
   corsHandler(request, response, () => {
     if (request.method !== "GET") {
-      response.status(404).send();
-      return;
+      return response.status(404).send();
     }
     return response.status(200).send("Up & Running...");
   });
@@ -36,8 +35,7 @@ export const sendContactUsEmail = functions.https.onRequest(
   async (request, response) => {
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
-        response.status(404).send();
-        return;
+        return response.status(404).send();
       }
       const feedback = request.body;
       try {
@@ -111,8 +109,7 @@ export const sendConnectingWithUsEmail = functions.https.onRequest(
   async (request, response) => {
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
-        response.status(404).send();
-        return;
+        return response.status(404).send();
       }
       const email = request.query?.email as string;
 
@@ -182,8 +179,7 @@ export const sendTransactionEmail = functions.https.onRequest(
   async (request, response) => {
     corsHandler(request, response, async () => {
       if (request.method !== "POST") {
-        response.status(404).send();
-        return;
+        return response.status(404).send();
       }
 
       try {
@@ -213,6 +209,7 @@ export const triggerCertificateEmailWebhookAction = functions.https.onRequest(
       try {
         functions.logger.info(`AWS SES Webhook body: ${request.body}`);
         await updateCertificateEmailStatus(request.body);
+        functions.logger.info("Successfully updated certificate email status");
         return response.status(200).send();
       } catch (err) {
         functions.logger.error(
@@ -224,31 +221,24 @@ export const triggerCertificateEmailWebhookAction = functions.https.onRequest(
   }
 );
 
-// export const screenshotCertificates = functions
-//   .runWith({ memory: "1GB" })
-//   .https.onRequest(async (request, response) => {
-//     corsHandler(request, response, async () => {
-//       if (request.method !== "POST") {
-//         response.status(404).send();
-//         return;
-//       }
-//       try {
-//         const { userId, templateId, certificates } = request.body;
-//         functions.logger.info(`Request Body: ${JSON.stringify(request.body)}`);
-//         const res = await takeCertificateScreenshots({
-//           userId,
-//           templateId,
-//           certificates,
-//         });
-//         response.status(200).json(res);
-//       } catch (err) {
-//         functions.logger.error(
-//           `An error occurred while taking screenshots: ${err}`
-//         );
-//         response.status(500).send(err);
-//       }
-//     });
-//   });
+export const triggerPaddleWebhookAction = functions.https.onRequest(
+  async (request, response) => {
+    corsHandler(request, response, () => {
+      if (request.method !== "POST") {
+        return response.status(404).send();
+      }
+      try {
+        functions.logger.info(`Paddle Webhook body: ${request.body}`);
+        return response.status(200).send("Up & Running...");
+      } catch (err) {
+        functions.logger.error(
+          `An error occurred while executing the paddle webhook action: ${err}`
+        );
+        return response.status(500).json(err);
+      }
+    });
+  }
+);
 
 export const onCertificateCreate = functions
   .runWith({ memory: "1GB" })
@@ -371,8 +361,18 @@ export const onUserCreate = functions.firestore
 
 export const onSendEmail = functions.pubsub
   .topic("email_topic")
-  .onPublish((message, context) => {
-    const data = message.json;
-    functions.logger.info(`Received message: ${JSON.stringify(data)}`);
-    return;
+  .onPublish(async (message, context) => {
+    try {
+      const data = message.json;
+      const res = await sendEmail(data);
+      functions.logger.info(
+        `Successfully sent the email: ${JSON.stringify(res)}`
+      );
+      return;
+    } catch (err) {
+      functions.logger.error(
+        `An error occurred while executing onSendEmail event: ${err}`
+      );
+      return err;
+    }
   });
