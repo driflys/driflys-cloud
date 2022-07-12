@@ -91,7 +91,7 @@ const getInjectedEmailTemplate = (
 
   switch (template) {
     case EmailTemplates.CERTIFICATE_EMAIL:
-      fileName = "emailTemplates/certificateEmail.html";
+      fileName = "emailTemplates/CertificateEmail.html";
       break;
 
     case EmailTemplates.GENERAL_PURPOSE_EMAIL:
@@ -99,7 +99,7 @@ const getInjectedEmailTemplate = (
       break;
 
     case EmailTemplates.VERIFICATION_EMAIL:
-      fileName = "emailTemplates/certificateEmail.html";
+      fileName = "emailTemplates/GeneralPurposeEmail.html";
       break;
 
     default:

@@ -42,7 +42,6 @@ export const sendCertificateEmail = async ({
     props: {
       fromName: emailTemplate?.fromName || "Driflys",
       template: EmailTemplates.CERTIFICATE_EMAIL,
-      subject: "Driflys Certificate",
       body: emailTemplate?.body || "Hello,\nThis is your certificate",
       receivers: [receiverEmail],
       configSet: EmailConfigSets.DRIFLYS_CERTIFICATE_EMAIL_CONFIG_SET,
@@ -66,11 +65,11 @@ export const sendCertificateEmail = async ({
         brand: {
           name: emailTemplate?.brand?.name || "Driflys",
           logo:
-            emailTemplate?.brand?.logo?.src ||
+            emailTemplate?.brand?.logo ||
             "https://res.cloudinary.com/driflys/image/upload/v1651332442/logos/Logo_Horizontal_-_No_Slogan.png",
-          logoHeight: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
+          logoHeight: getEmailTemplateLogoSize(emailTemplate?.brand?.logoSize)
             .height,
-          logoWidth: getEmailTemplateLogoSize(emailTemplate?.brand?.logo?.size)
+          logoWidth: getEmailTemplateLogoSize(emailTemplate?.brand?.logoSize)
             .width,
           address: emailTemplate?.brand?.address || "Matale, Sri Lanka",
         },
